@@ -1,0 +1,43 @@
+# Source files (TypeScript)
+src/
+tsconfig.json
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test & Coverage
+coverage/
+*.test.ts
+*.spec.ts
+
+# Build artifacts we don't need
+dist/*.map
+dist/*.d.ts.map
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development
+CONTRIBUTING.md
+

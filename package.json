@@ -1,0 +1,70 @@
+{
+  "name": "llmd-cli",
+  "version": "1.0.0",
+  "description": "Talk to your terminal. Let AI write the commands.",
+  "main": "dist/index.js",
+  "bin": {
+    "llmd": "dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "cli",
+    "terminal",
+    "shell",
+    "ai",
+    "llm",
+    "natural-language",
+    "openai",
+    "anthropic",
+    "claude",
+    "groq",
+    "gemini",
+    "command-line"
+  ],
+  "author": "Himanshu Pathak",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/himanshupathak/llmd.git"
+  },
+  "bugs": {
+    "url": "https://github.com/himanshupathak/llmd/issues"
+  },
+  "homepage": "https://github.com/himanshupathak/llmd#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "conf": "^13.0.1",
+    "groq-sdk": "^0.8.0",
+    "inquirer": "^12.1.0",
+    "openai": "^4.73.0",
+    "ora": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
