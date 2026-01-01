@@ -29,35 +29,43 @@
 ## Quick Start
 
 ```bash
-# Install globally
-npm install -g llmd-cli
+# Install globally (one-time sudo required - completely safe!)
+sudo npm install -g llmd-cli
 
-# Run the setup wizard
+# Run the setup wizard (no sudo needed)
 llmd setup
 
-# Start using llmd
+# Start using llmd (no sudo needed)
 llmd "list all files sorted by size"
 ```
 
 ## Installation
 
+> **💡 About `sudo`:** Global installation requires `sudo` (one-time only) because it installs the `llmd` command to a system directory. This is completely safe and standard practice for all global npm packages—you're just installing a command-line tool, nothing more. After installation, you can use `llmd` normally without `sudo`.
+
 ### npm (recommended)
 
 ```bash
-npm install -g llmd-cli
+sudo npm install -g llmd-cli
 ```
+
+> **Note:** This is a one-time setup. After installation, you'll use `llmd` without `sudo` for all commands. On Windows, run your terminal as Administrator.
 
 ### yarn
 
 ```bash
-yarn global add llmd-cli
+sudo yarn global add llmd-cli
 ```
+
+> **Note:** One-time `sudo` required. After installation, use `llmd` normally. On Windows, run your terminal as Administrator.
 
 ### pnpm
 
 ```bash
-pnpm add -g llmd-cli
+sudo pnpm add -g llmd-cli
 ```
+
+> **Note:** One-time `sudo` required. After installation, use `llmd` normally. On Windows, run your terminal as Administrator.
 
 ### From Source
 
@@ -66,8 +74,10 @@ git clone https://github.com/goldenhiman/llmd.git
 cd llmd
 npm install
 npm run build
-npm link  # Creates a global symlink so you can use 'llmd' command
+sudo npm link  # Creates a global symlink so you can use 'llmd' command
 ```
+
+> **Note:** One-time `sudo` required for `npm link` to create the global command. After this, use `llmd` normally without `sudo`.
 
 ## Configuration
 
