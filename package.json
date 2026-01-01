@@ -35,12 +35,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://https://github.com/goldenhiman/llmd.git"
+    "url": "git+https://github.com/goldenhiman/llmd.git"
   },
   "bugs": {
-    "url": "https://https://github.com/goldenhiman/llmd/issues"
+    "url": "https://github.com/goldenhiman/llmd/issues"
   },
-  "homepage": "https://https://github.com/goldenhiman/llmd#readme",
+  "homepage": "https://github.com/goldenhiman/llmd#readme",
   "files": [
     "dist",
     "README.md",

@@ -62,7 +62,7 @@ pnpm add -g llmd-cli
 ### From Source
 
 ```bash
-git clone https://github.com/himanshupathak/llmd.git
+git clone https://github.com/goldenhiman/llmd.git
 cd llmd
 npm install
 npm run build
@@ -432,7 +432,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ```bash
 # Clone the repository
-git clone https://github.com/himanshupathak/llmd.git
+git clone https://github.com/goldenhiman/llmd.git
 cd llmd
 
 # Install dependencies
