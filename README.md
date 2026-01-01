@@ -66,7 +66,7 @@ git clone https://github.com/himanshupathak/llmd.git
 cd llmd
 npm install
 npm run build
-npm link
+npm link  # Creates a global symlink so you can use 'llmd' command
 ```
 
 ## Configuration
@@ -106,6 +106,9 @@ llmd config threshold 80
 
 # View config file location
 llmd config path
+
+# Reset configuration to defaults
+llmd config reset
 ```
 
 ### Configuration File
@@ -215,6 +218,8 @@ When you run a command, llmd will:
   Edit command
   Cancel
 ```
+
+**Selecting "Edit command"** allows you to modify the generated command before execution. You'll be prompted to enter your edited version, which will then go through the same verification and safety checks.
 
 ## Supported Providers
 
@@ -328,7 +333,38 @@ Commands:
   config model <p> <model>  Set the model for a provider
   config path               Show config file path
   config reset              Reset configuration to defaults
+  update [check|install]    Check for updates or install latest version
+  scan                      Scan system for available CLI tools
+  tools                     List scanned CLI tools
 ```
+
+### Update Commands
+
+Keep llmd up to date:
+
+```bash
+# Check if a newer version is available
+llmd update
+# or explicitly
+llmd update check
+
+# Install the latest version
+llmd update install
+```
+
+### Tool Scanning
+
+llmd can scan your system to discover available CLI tools, which helps it generate more accurate commands:
+
+```bash
+# Scan your system for installed CLI tools
+llmd scan
+
+# List all scanned tools
+llmd tools
+```
+
+The scan command detects tools in your PATH and stores them in a local configuration file. This information helps llmd understand what commands are available on your system and generate more appropriate suggestions.
 
 ## Troubleshooting
 
@@ -372,6 +408,21 @@ llmd "delete all .log files in the current directory"
 - **Anthropic**: Claude models require a paid account
 - **Groq**: Free tier has rate limits
 - **Gemini**: Some regions may have restrictions
+
+### Updating llmd
+
+To update to the latest version:
+
+```bash
+# Check for updates
+llmd update
+
+# Install the latest version
+llmd update install
+
+# Or update via npm
+npm install -g llmd-cli@latest
+```
 
 ## Contributing
 
