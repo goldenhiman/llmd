@@ -5,6 +5,8 @@
  | | | | | | | | (_| |
  |_|_|_| |_| |_|\__,_|
 ```
+https://github.com/user-attachments/assets/4d2225e1-3762-48d1-87b4-1045e64ec5c4
+
 
 # llmd
 
