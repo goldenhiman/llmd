@@ -8,6 +8,7 @@ import { verifyCommand, formatVerificationIssues, formatSuggestedQuestions } fro
 import { checkSeverity, getSeverityEmoji, requiresConfirmation } from '../services/severity.js';
 import { executeCommand } from '../utils/terminal.js';
 import { checkForUpdates, displayUpdateHint } from '../utils/version.js';
+import { sessionManager } from '../services/session.js';
 import type { GeneratedCommand, VerificationResult } from '../types.js';
 
 // Store version check result (started in background)
@@ -40,14 +41,23 @@ export async function runCommand(query: string): Promise<void> {
     const verification = await verifyCommand(generated.command, query);
     spinner.stop();
 
-    // Handle low confidence - ask for clarification
-    if (verification.needsClarification) {
+    // Check if this is an informational response (AI verified)
+    if (verification.isInformationalResponse && verification.extractedMessage) {
+      // For informational responses, show in beautiful box
+      // Include clarification info if needed, but still show the message
+      const clarificationInfo = verification.needsClarification ? {
+        issues: verification.result.issues,
+        questions: verification.result.suggestedQuestions
+      } : undefined;
+      
+      await displayInformationalMessage(query, generated, verification.result, verification.extractedMessage, clarificationInfo);
+    } else if (verification.needsClarification) {
+      // Handle low confidence for non-informational commands - ask for clarification
       await handleClarification(query, generated, verification.result);
-      return;
+    } else {
+      // Display and potentially execute command
+      await displayAndExecute(query, generated, verification.result);
     }
-
-    // Display and potentially execute command
-    await displayAndExecute(generated, verification.result);
 
   } catch (error) {
     spinner.stop();
@@ -57,6 +67,84 @@ export async function runCommand(query: string): Promise<void> {
     if (message.includes('API')) {
       console.log(chalk.dim('Check your API key configuration with: llmd config list\n'));
     }
+  }
+}
+
+async function displayInformationalMessage(
+  query: string,
+  generated: GeneratedCommand,
+  verification: VerificationResult,
+  message: string,
+  clarificationNeeded?: { issues?: string[]; questions?: string[] }
+): Promise<void> {
+  // Build beautiful content for the green box
+  let content = chalk.green.bold(message);
+  
+  // If clarification is needed, add it beautifully
+  if (clarificationNeeded) {
+    if (clarificationNeeded.issues && clarificationNeeded.issues.length > 0) {
+      content += '\n\n' + chalk.yellow('⚠️  Note:');
+      clarificationNeeded.issues.forEach(issue => {
+        content += '\n' + chalk.dim(`   ${issue}`);
+      });
+    }
+    
+    if (clarificationNeeded.questions && clarificationNeeded.questions.length > 0) {
+      content += '\n\n' + chalk.cyan('💭 I could help better if you clarify:');
+      clarificationNeeded.questions.forEach((q, i) => {
+        content += '\n' + chalk.dim(`   ${i + 1}. ${q}`);
+      });
+    }
+  }
+
+  // Display in a beautiful green box
+  console.log('\n' + boxen(content, {
+    padding: 1,
+    margin: 0,
+    borderStyle: 'round',
+    borderColor: 'green',
+    title: '💬 Response',
+    titleAlignment: 'left'
+  }));
+
+  // Track in session (informational response, not executed)
+  sessionManager.addCommand(
+    query,
+    generated,
+    verification,
+    undefined, // No execution result - this is just an informational response
+    process.cwd()
+  );
+
+  // Ask if user wants to continue with another command
+  const { action } = await inquirer.prompt<{ action: string }>([
+    {
+      type: 'list',
+      name: 'action',
+      message: 'What would you like to do?',
+      choices: [
+        { name: 'Continue with another command', value: 'continue' },
+        { name: 'Done', value: 'done' }
+      ],
+      default: 'continue'
+    }
+  ]);
+
+  if (action === 'continue') {
+    // Prompt for next command
+    const { nextQuery } = await inquirer.prompt<{ nextQuery: string }>([
+      {
+        type: 'input',
+        name: 'nextQuery',
+        message: 'What would you like to do?'
+      }
+    ]);
+
+    if (nextQuery.trim()) {
+      await runCommand(nextQuery);
+    }
+  } else {
+    console.log(chalk.dim('\nGoodbye!\n'));
   }
 }
 
@@ -118,11 +206,12 @@ async function handleClarification(
       await runCommand(enhancedQuery);
     }
   } else if (action === 'run') {
-    await displayAndExecute(generated, verification);
+    await displayAndExecute(originalQuery, generated, verification);
   }
 }
 
 async function displayAndExecute(
+  query: string,
   generated: GeneratedCommand,
   verification: VerificationResult
 ): Promise<void> {
@@ -177,9 +266,29 @@ async function displayAndExecute(
     ]);
 
     if (confirm) {
-      await execute(generated.command);
+      const result = await execute(generated.command);
+      // Track in session
+      sessionManager.addCommand(
+        query,
+        generated,
+        verification,
+        {
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr
+        },
+        process.cwd()
+      );
     } else {
       console.log(chalk.dim('\nCommand cancelled.\n'));
+      // Track cancelled command (no execution)
+      sessionManager.addCommand(
+        query,
+        generated,
+        verification,
+        undefined,
+        process.cwd()
+      );
     }
   } else {
     // Safe command - normal flow
@@ -198,7 +307,19 @@ async function displayAndExecute(
     ]);
 
     if (action === 'run') {
-      await execute(generated.command);
+      const result = await execute(generated.command);
+      // Track in session
+      sessionManager.addCommand(
+        query,
+        generated,
+        verification,
+        {
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr
+        },
+        process.cwd()
+      );
     } else if (action === 'edit') {
       const { editedCommand } = await inquirer.prompt<{ editedCommand: string }>([
         {
@@ -223,18 +344,46 @@ async function displayAndExecute(
           ]);
           if (!confirm) {
             console.log(chalk.dim('\nCommand cancelled.\n'));
+            // Track cancelled edited command
+            sessionManager.addCommand(
+              query,
+              { ...generated, command: editedCommand },
+              verification,
+              undefined,
+              process.cwd()
+            );
             return;
           }
         }
-        await execute(editedCommand);
+        const result = await execute(editedCommand);
+        // Track edited command in session
+        sessionManager.addCommand(
+          query,
+          { ...generated, command: editedCommand },
+          verification,
+          {
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr
+          },
+          process.cwd()
+        );
       }
     } else {
       console.log(chalk.dim('\nCommand cancelled.\n'));
+      // Track cancelled command
+      sessionManager.addCommand(
+        query,
+        generated,
+        verification,
+        undefined,
+        process.cwd()
+      );
     }
   }
 }
 
-async function execute(command: string): Promise<void> {
+async function execute(command: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   console.log(chalk.dim('\nExecuting...\n'));
   
   const result = await executeCommand(command);
@@ -247,6 +396,8 @@ async function execute(command: string): Promise<void> {
 
   // Show update hint if available (non-blocking, won't delay if not ready)
   await showUpdateHintIfAvailable();
+  
+  return result;
 }
 
 async function showUpdateHintIfAvailable(): Promise<void> {
@@ -259,4 +410,3 @@ async function showUpdateHintIfAvailable(): Promise<void> {
     }
   }
 }
-

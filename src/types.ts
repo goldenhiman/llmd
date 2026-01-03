@@ -49,5 +49,6 @@ export interface LLMProvider {
   name: ProviderName;
   generateCommand(query: string, context: ShellContext): Promise<GeneratedCommand>;
   verifyCommand(command: string, query: string, context: ShellContext): Promise<VerificationResult>;
+  checkInformationalResponse(command: string, query: string): Promise<{ isInformational: boolean; message?: string }>;
 }
 

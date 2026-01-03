@@ -1,7 +1,8 @@
 import type { ShellContext } from '../types.js';
 import { toolsConfigManager } from '../config/tools.js';
+import { sessionManager } from '../services/session.js';
 
-export function getSystemPrompt(context: ShellContext): string {
+export function getSystemPrompt(context: ShellContext, includeHistory: boolean = true): string {
   // Get available tools if scanned
   const tools = toolsConfigManager.getAvailableTools();
   let toolsSection = '';
@@ -22,8 +23,11 @@ export function getSystemPrompt(context: ShellContext): string {
     toolsSection = `\nAvailable CLI tools on this system:\n${toolLines}\n\nPrefer using these available tools in your commands.`;
   }
 
-  return `You are a shell command generator. Convert the user's natural language request into a shell command.
+  // Get session context if available
+  const historyContext = includeHistory ? sessionManager.getContextSummary(3) : '';
 
+  return `You are a shell command generator. Convert the user's natural language request into a shell command.
+${historyContext}
 Environment:
 - OS: ${context.os}
 - Shell: ${context.shell}
@@ -34,6 +38,10 @@ IMPORTANT: The "command" value must be a RAW, EXECUTABLE shell command. Do NOT i
 - $ or # prefixes
 - Comments
 - Line breaks (use ; or && for multiple commands)
+
+If the user asks a conversational question that doesn't require a shell command (like "who are you", "what can you do", "hello"), respond with an echo command that provides the answer. For example:
+- "who are you" -> echo "I am llmd, a shell command generator that translates natural language into shell commands."
+- "hello" -> echo "Hello! I can help you generate shell commands. Just describe what you want to do."
 
 Respond with ONLY this JSON (no other text):
 {"command": "<executable command here>", "explanation": "<brief description>"}`;
