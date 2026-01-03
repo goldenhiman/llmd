@@ -6,6 +6,8 @@ export interface VerificationOutcome {
   passed: boolean;
   result: VerificationResult;
   needsClarification: boolean;
+  isInformationalResponse: boolean;
+  extractedMessage?: string;
 }
 
 export async function verifyCommand(command: string, query: string): Promise<VerificationOutcome> {
@@ -16,11 +18,42 @@ export async function verifyCommand(command: string, query: string): Promise<Ver
   const passed = result.confidence >= threshold && result.isCorrect;
   const needsClarification = !passed && (result.suggestedQuestions?.length ?? 0) > 0;
 
+  // Check if this is an informational response (echo command that's just a reply)
+  const infoCheck = await checkIfInformationalResponse(command, query);
+
   return {
     passed,
     result,
-    needsClarification
+    needsClarification,
+    isInformationalResponse: infoCheck.isInformational,
+    extractedMessage: infoCheck.message
   };
+}
+
+/**
+ * Uses AI to check if a command is just an informational response
+ * (e.g., echo "I am a shell command generator" in response to "who are you")
+ */
+async function checkIfInformationalResponse(command: string, query: string): Promise<{ isInformational: boolean; message?: string }> {
+  // Quick regex pre-check to avoid unnecessary API calls
+  const trimmed = command.trim();
+  const looksLikeEcho = /^(echo|printf)\s+/.test(trimmed);
+  
+  if (!looksLikeEcho) {
+    return { isInformational: false };
+  }
+
+  try {
+    const result = await llmService.checkInformationalResponse(command, query);
+    return result;
+  } catch {
+    // Fallback to simple regex extraction if AI check fails
+    const echoMatch = trimmed.match(/^echo\s+["'](.+)["']\s*$/);
+    if (echoMatch) {
+      return { isInformational: true, message: echoMatch[1] };
+    }
+    return { isInformational: false };
+  }
 }
 
 export function formatVerificationIssues(result: VerificationResult): string[] {

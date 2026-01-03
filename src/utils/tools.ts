@@ -90,6 +90,12 @@ const TOOLS_TO_SCAN: Record<string, string[]> = {
 // Get the path of a command using 'which' or 'where' (Windows)
 function getCommandPath(cmd: string): string | null {
   try {
+    // Sanitize command name - only allow alphanumeric, dash, underscore
+    // This prevents command injection attacks
+    if (!/^[a-zA-Z0-9_-]+$/.test(cmd)) {
+      return null;
+    }
+    
     const isWindows = process.platform === 'win32';
     const whichCmd = isWindows ? 'where' : 'which';
     const result = execSync(`${whichCmd} ${cmd} 2>/dev/null`, {

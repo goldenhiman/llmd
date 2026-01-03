@@ -378,6 +378,57 @@ llmd tools
 
 The scan command detects tools in your PATH and stores them in a local configuration file. This information helps llmd understand what commands are available on your system and generate more appropriate suggestions.
 
+## Session Management
+
+llmd automatically tracks your command history in sessions to provide context-aware command generation. Each terminal session maintains:
+
+- **Command History** - Last 20 commands with their queries, generated commands, and execution results
+- **Execution Results** - Exit codes and truncated output (stdout/stderr limited to 500 characters)
+- **Current Working Directory** - Tracks directory changes across commands
+- **Session Metadata** - Session start time, last activity, and terminal identification
+
+Sessions automatically expire after 24 hours of inactivity. This context helps llmd generate more accurate commands based on your recent activity, understanding the flow of your work and adapting to your current directory and previous commands.
+
+### How It Works
+
+When you run commands, llmd:
+1. Tracks each command in your current session
+2. Uses the last 3-5 commands as context when generating new commands
+3. Understands your current working directory
+4. Learns from successful and failed command executions
+
+This means llmd gets smarter as you use it, understanding patterns in your workflow and generating more relevant suggestions.
+
+## Conversational Queries
+
+llmd can handle conversational questions that don't require shell commands, making the tool more interactive and user-friendly:
+
+```bash
+llmd "who are you"
+llmd "what can you do"
+llmd "hello"
+llmd "help me"
+```
+
+For these queries, llmd provides informational responses instead of generating shell commands. The AI recognizes conversational intent and responds appropriately, helping users understand the tool's capabilities without executing unnecessary commands.
+
+### Example
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  💬 Response                                                │
+│                                                             │
+│  I am llmd, a shell command generator that translates     │
+│  natural language into shell commands. Just describe what  │
+│  you want to do, and I'll generate the command for you!    │
+└─────────────────────────────────────────────────────────────┘
+? What would you like to do?
+❯ Continue with another command
+  Done
+```
+
+This feature makes llmd feel more like a helpful assistant rather than just a command generator.
+
 ## Troubleshooting
 
 ### "No LLM provider configured"
