@@ -1,6 +1,6 @@
 {
   "name": "llmd-cli",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Talk to your terminal. Let AI write the commands.",
   "main": "dist/index.js",
   "bin": {

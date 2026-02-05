@@ -45,9 +45,25 @@ export interface SeverityCheck {
   warnings: string[];
 }
 
+export interface InfoGatheringRequest {
+  needsInfo: true;
+  probeCommand: string;
+  reason: string;
+}
+
+export interface CommandResponse {
+  needsInfo: false;
+  command: string;
+  explanation: string;
+}
+
+export type GeneratedCommandResult = InfoGatheringRequest | CommandResponse;
+
 export interface LLMProvider {
   name: ProviderName;
   generateCommand(query: string, context: ShellContext): Promise<GeneratedCommand>;
+  generateCommandWithInfoGathering(query: string, context: ShellContext): Promise<GeneratedCommandResult>;
+  generateCommandWithContext(query: string, context: ShellContext, gatheredInfo: string): Promise<GeneratedCommand>;
   verifyCommand(command: string, query: string, context: ShellContext): Promise<VerificationResult>;
   checkInformationalResponse(command: string, query: string): Promise<{ isInformational: boolean; message?: string }>;
 }

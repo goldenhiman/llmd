@@ -4,6 +4,110 @@ import ora from 'ora';
 import { toolsConfigManager } from '../config/tools.js';
 import type { ToolInfo } from '../types.js';
 
+// Safe read-only commands that can be used for information gathering
+// These commands only read data and do not modify the system
+const SAFE_READ_COMMANDS: Set<string> = new Set([
+  // File listing and info
+  'ls', 'dir', 'tree', 'find', 'locate', 'stat', 'file', 'du', 'df',
+  'basename', 'dirname', 'realpath', 'readlink',
+  // File content reading (non-destructive)
+  'cat', 'head', 'tail', 'less', 'more', 'wc', 'strings',
+  // Text searching
+  'grep', 'egrep', 'fgrep', 'rg', 'ag',
+  // System info
+  'uname', 'hostname', 'uptime', 'whoami', 'id', 'groups', 'w', 'who',
+  'date', 'cal', 'free', 'vmstat', 'lscpu', 'lsblk', 'lsusb', 'lspci',
+  // Process info
+  'ps', 'top', 'htop', 'pgrep',
+  // Network info (read-only)
+  'ifconfig', 'ip', 'netstat', 'ss', 'nslookup', 'dig', 'host', 'route',
+  // Package info (read-only queries)
+  'which', 'whereis', 'type', 'command',
+  // Version control (read-only)
+  'git status', 'git log', 'git branch', 'git diff', 'git show', 'git ls-files',
+  'git remote', 'git tag',
+  // Environment
+  'env', 'printenv', 'echo', 'pwd',
+  // JSON/YAML parsing
+  'jq', 'yq',
+]);
+
+// Command prefixes that are safe for reading
+const SAFE_COMMAND_PREFIXES: string[] = [
+  'ls ', 'dir ', 'cat ', 'head ', 'tail ', 'grep ', 'find ', 'tree ',
+  'stat ', 'file ', 'wc ', 'du ', 'df ', 'ps ', 'echo $', 'printenv ',
+  'git status', 'git log', 'git branch', 'git diff', 'git show', 'git ls-files',
+  'git remote', 'git tag', 'which ', 'whereis ', 'type ', 'jq ', 'yq ',
+];
+
+// Dangerous patterns that should never be allowed in probe commands
+const DANGEROUS_PATTERNS: RegExp[] = [
+  /\brm\b/, /\brmdir\b/, /\bmv\b/, /\bcp\b.*-[rf]/, /\bdd\b/,
+  /\bmkdir\b/, /\btouch\b/, /\bchmod\b/, /\bchown\b/,
+  /\bsudo\b/, /\bdoas\b/,
+  /[>|]/, // Redirections and pipes that could write
+  /\bgit\s+(push|commit|merge|rebase|reset|checkout|add)\b/,
+  /\bnpm\s+(install|uninstall|update|publish)\b/,
+  /\bpip\s+(install|uninstall)\b/,
+  /\bbrew\s+(install|uninstall|upgrade)\b/,
+  /\bapt(-get)?\s+(install|remove|purge)\b/,
+  /\byum\s+(install|remove)\b/,
+  /\bkill\b/, /\bpkill\b/, /\bkillall\b/,
+  /\bcurl\b.*-[XdD]/, /\bwget\b.*-O/,  // Curl/wget with write operations
+];
+
+/**
+ * Checks if a command is safe for information gathering (read-only).
+ * Returns true if the command is safe to execute for gathering context.
+ */
+export function isProbeCommandSafe(command: string): { safe: boolean; reason?: string } {
+  const trimmedCmd = command.trim();
+  
+  // Check for dangerous patterns first
+  for (const pattern of DANGEROUS_PATTERNS) {
+    if (pattern.test(trimmedCmd)) {
+      return { 
+        safe: false, 
+        reason: `Command contains potentially dangerous operation: ${pattern.source}` 
+      };
+    }
+  }
+  
+  // Check if it starts with a safe command prefix
+  for (const prefix of SAFE_COMMAND_PREFIXES) {
+    if (trimmedCmd.startsWith(prefix) || trimmedCmd === prefix.trim()) {
+      return { safe: true };
+    }
+  }
+  
+  // Extract the base command (first word)
+  const baseCommand = trimmedCmd.split(/\s+/)[0];
+  
+  // Check if base command is in safe list
+  if (SAFE_READ_COMMANDS.has(baseCommand)) {
+    // Additional check: make sure there's no output redirection
+    if (trimmedCmd.includes('>') || trimmedCmd.includes('>>')) {
+      return { 
+        safe: false, 
+        reason: 'Command contains output redirection which could modify files' 
+      };
+    }
+    return { safe: true };
+  }
+  
+  return { 
+    safe: false, 
+    reason: `Command '${baseCommand}' is not in the safe read-only commands list` 
+  };
+}
+
+/**
+ * Get the list of safe commands for display in prompts
+ */
+export function getSafeCommandsList(): string {
+  return Array.from(SAFE_READ_COMMANDS).join(', ');
+}
+
 // Common CLI tools to scan for (organized by category)
 const TOOLS_TO_SCAN: Record<string, string[]> = {
   // File operations

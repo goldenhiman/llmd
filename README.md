@@ -22,6 +22,7 @@ https://github.com/user-attachments/assets/4d2225e1-3762-48d1-87b4-1045e64ec5c4
 
 - **Natural Language Interface** - Describe what you want in plain English
 - **Multi-Provider Support** - Use OpenAI, Anthropic (Claude), Groq, Google Gemini, or OpenRouter
+- **Smart Information Gathering** - AI probes your system first when needed for accurate commands
 - **Self-Verification** - AI verifies its own commands with confidence scoring
 - **Dangerous Command Detection** - Automatic warnings for destructive operations
 - **Interactive Execution** - Review, edit, or cancel commands before running
@@ -334,6 +335,7 @@ Natural language to shell commands using AI
 
 Options:
   -V, --version             output the version number
+  --no-probe                disable automatic information gathering
   -h, --help                display help for command
 
 Commands:
@@ -398,6 +400,81 @@ When you run commands, llmd:
 4. Learns from successful and failed command executions
 
 This means llmd gets smarter as you use it, understanding patterns in your workflow and generating more relevant suggestions.
+
+## Smart Information Gathering
+
+llmd can intelligently gather system information before generating commands, ensuring more accurate results for complex requests.
+
+### When It Activates
+
+The AI will request to probe your system when:
+
+1. **It needs to know specific values** - Finding the largest file, current git branch, or specific process
+2. **Selecting from existing items** - Picking files, processes, or branches based on criteria
+3. **Semantic analysis is required** - Identifying files by meaning (e.g., "files with animal-like names")
+
+### Example Flow
+
+```bash
+llmd "delete the largest file in this directory"
+```
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  🔍 Need More Info                                          │
+│                                                             │
+│  📋 Information Gathering Request                           │
+│                                                             │
+│  To generate a more accurate command, I need to gather      │
+│  some information first.                                    │
+│                                                             │
+│  Reason: Need to identify the largest file                  │
+│                                                             │
+│  Read-only command to run:                                  │
+│    $ ls -lS                                                 │
+└─────────────────────────────────────────────────────────────┘
+? Allow this read-only command to gather information?
+❯ Yes, run the command
+  No, generate without additional info
+  Cancel
+```
+
+After gathering information, llmd generates a precise command:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  $ rm "./large-video.mp4"                                   │
+│                                                             │
+│  Removes the largest file (large-video.mp4, 1.2GB)          │
+│                                                             │
+│  Confidence: 95% • Provider: openai                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Safety Features
+
+- **Read-only probes only** - Only safe commands like `ls`, `cat`, `git status`, `ps` are allowed
+- **User approval required** - You always approve probe commands before execution
+- **Automatic retry** - If an unsafe probe is suggested, llmd asks the AI for a safer alternative (up to 3 times)
+- **Disable option** - Use `--no-probe` flag to skip information gathering
+
+```bash
+# Disable information gathering
+llmd --no-probe "delete the largest file"
+```
+
+### Semantic Analysis
+
+llmd excels at tasks requiring AI judgment, not just pattern matching:
+
+```bash
+# These queries trigger intelligent probing
+llmd "are there any files with animal-like names here?"
+llmd "which files look like configuration files?"
+llmd "find files that seem related to authentication"
+```
+
+The AI will first list your files, then apply reasoning to identify matches—far more accurate than regex patterns.
 
 ## Conversational Queries
 
