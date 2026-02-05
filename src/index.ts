@@ -38,7 +38,8 @@ program
 // Main command - run natural language query
 program
   .argument('[query...]', 'Natural language command to translate')
-  .action(async (queryParts: string[]) => {
+  .option('--no-probe', 'Disable automatic information gathering')
+  .action(async (queryParts: string[], options: { probe: boolean }) => {
     if (queryParts.length === 0) {
       console.log(banner);
       program.help();
@@ -46,7 +47,7 @@ program
     }
     
     const query = queryParts.join(' ');
-    await runCommand(query);
+    await runCommand(query, options.probe);
   });
 
 // Setup command

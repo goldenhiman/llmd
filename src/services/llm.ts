@@ -2,7 +2,7 @@ import { configManager } from '../config/manager.js';
 import { createProvider } from '../providers/index.js';
 import { getShellContext } from '../utils/terminal.js';
 import { sessionManager } from './session.js';
-import type { LLMProvider, GeneratedCommand, VerificationResult, ShellContext } from '../types.js';
+import type { LLMProvider, GeneratedCommand, GeneratedCommandResult, VerificationResult, ShellContext } from '../types.js';
 
 export class LLMService {
   private provider: LLMProvider | null = null;
@@ -37,6 +37,28 @@ export class LLMService {
     sessionManager.getCurrentSession();
     
     return provider.generateCommand(query, this.context);
+  }
+
+  async generateCommandWithInfoGathering(query: string): Promise<GeneratedCommandResult> {
+    const provider = this.getProvider();
+    // Update context before generating (in case cwd changed)
+    this.context = getShellContext();
+    
+    // Ensure we have an active session
+    sessionManager.getCurrentSession();
+    
+    return provider.generateCommandWithInfoGathering(query, this.context);
+  }
+
+  async generateCommandWithContext(query: string, gatheredInfo: string): Promise<GeneratedCommand> {
+    const provider = this.getProvider();
+    // Update context before generating (in case cwd changed)
+    this.context = getShellContext();
+    
+    // Ensure we have an active session
+    sessionManager.getCurrentSession();
+    
+    return provider.generateCommandWithContext(query, this.context, gatheredInfo);
   }
 
   async verifyCommand(command: string, query: string): Promise<VerificationResult> {

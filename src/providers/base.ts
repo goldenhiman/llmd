@@ -1,5 +1,5 @@
-import type { LLMProvider, GeneratedCommand, VerificationResult, ShellContext, ProviderConfig, ProviderName } from '../types.js';
-import { getSystemPrompt, getVerificationPrompt } from '../utils/prompts.js';
+import type { LLMProvider, GeneratedCommand, GeneratedCommandResult, VerificationResult, ShellContext, ProviderConfig, ProviderName } from '../types.js';
+import { getSystemPrompt, getVerificationPrompt, getInfoGatheringSystemPrompt, getSystemPromptWithGatheredInfo } from '../utils/prompts.js';
 
 export abstract class BaseLLMProvider implements LLMProvider {
   abstract name: ProviderName;
@@ -20,6 +20,66 @@ export abstract class BaseLLMProvider implements LLMProvider {
     ]);
 
     // Use robust extraction that handles various response formats
+    const result = this.extractCommand(response);
+    
+    if (!result.command) {
+      throw new Error('Failed to extract a valid command from the response');
+    }
+    
+    return result;
+  }
+
+  async generateCommandWithInfoGathering(query: string, context: ShellContext): Promise<GeneratedCommandResult> {
+    const systemPrompt = getInfoGatheringSystemPrompt(context);
+    
+    const response = await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: query }
+    ]);
+
+    try {
+      const parsed = this.parseJSON(response);
+      
+      if (parsed.needsInfo === true && parsed.probeCommand) {
+        return {
+          needsInfo: true,
+          probeCommand: this.sanitizeCommand(String(parsed.probeCommand)),
+          reason: String(parsed.reason || 'Need more information to generate accurate command')
+        };
+      } else {
+        // It's a direct command response
+        const command = parsed.command ? this.sanitizeCommand(String(parsed.command)) : '';
+        if (!command) {
+          throw new Error('No command in response');
+        }
+        return {
+          needsInfo: false,
+          command,
+          explanation: String(parsed.explanation || '')
+        };
+      }
+    } catch {
+      // Fallback to regular command extraction
+      const result = this.extractCommand(response);
+      if (!result.command) {
+        throw new Error('Failed to extract a valid command from the response');
+      }
+      return {
+        needsInfo: false,
+        command: result.command,
+        explanation: result.explanation
+      };
+    }
+  }
+
+  async generateCommandWithContext(query: string, context: ShellContext, gatheredInfo: string): Promise<GeneratedCommand> {
+    const systemPrompt = getSystemPromptWithGatheredInfo(context, gatheredInfo);
+    
+    const response = await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: query }
+    ]);
+
     const result = this.extractCommand(response);
     
     if (!result.command) {
