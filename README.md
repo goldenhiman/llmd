@@ -22,7 +22,8 @@ https://github.com/user-attachments/assets/4d2225e1-3762-48d1-87b4-1045e64ec5c4
 
 - **Natural Language Interface** - Describe what you want in plain English
 - **Multi-Provider Support** - Use OpenAI, Anthropic (Claude), Groq, Google Gemini, or OpenRouter
-- **Smart Information Gathering** - AI probes your system first when needed for accurate commands
+- **AI Orchestration** - Classifies your intent first (command, probe, conversation, clarify) for smarter routing and fewer API calls
+- **Smart Information Gathering** - Probes your system with read-only commands when needed for accurate results
 - **Self-Verification** - AI verifies its own commands with confidence scoring
 - **Dangerous Command Detection** - Automatic warnings for destructive operations
 - **Interactive Execution** - Review, edit, or cancel commands before running
@@ -209,13 +210,16 @@ llmd "install prettier as a dev dependency"
 
 ### Interactive Flow
 
-When you run a command, llmd will:
+When you run a command, llmd uses an **AI orchestrator** to classify your intent first, then routes accordingly:
 
-1. **Generate** the shell command using AI
-2. **Verify** the command for accuracy
-3. **Display** the command with confidence score
-4. **Warn** about dangerous operations (if applicable)
-5. **Prompt** you to run, edit, or cancel
+1. **Classify** your intent (command, probe, conversation, or clarify)
+2. **Generate** the shell command—or probe first if system info is needed
+3. **Verify** the command for accuracy
+4. **Display** the command with confidence score
+5. **Warn** about dangerous operations (if applicable)
+6. **Prompt** you to run, edit, or cancel
+
+Conversational queries (e.g., "hello", "who are you") are handled with a single AI call and no command generation.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -403,15 +407,29 @@ This means llmd gets smarter as you use it, understanding patterns in your workf
 
 ## Smart Information Gathering
 
-llmd can intelligently gather system information before generating commands, ensuring more accurate results for complex requests.
+llmd uses an **AI orchestrator** that classifies your query before generating commands. If the orchestrator determines that system information is needed, it will request to probe your system first—ensuring more accurate results for complex requests.
 
-### When It Activates
+### When Probing Activates
 
-The AI will request to probe your system when:
+The orchestrator routes to **probe** when:
 
 1. **It needs to know specific values** - Finding the largest file, current git branch, or specific process
 2. **Selecting from existing items** - Picking files, processes, or branches based on criteria
-3. **Semantic analysis is required** - Identifying files by meaning (e.g., "files with animal-like names")
+3. **Semantic analysis is required** - Identifying files by meaning (e.g., "files with animal-like names")—the AI must see the data and apply reasoning, not use brittle regex
+4. **Avoiding embedded discovery** - Instead of complex subshells like `$(find ... | sort | head)`, llmd probes first, then generates a simple command with the actual values
+
+### Orchestration Flow
+
+The orchestrator classifies every query into one of four intents:
+
+| Intent | Example | AI Calls |
+|--------|---------|----------|
+| **command** | "list files", "show git log" | Classify → Generate → Verify |
+| **probe** | "delete the largest file", "files with animal names" | Classify → Probe → Generate → Verify |
+| **conversation** | "hello", "who are you" | Classify only (1 call) |
+| **clarify** | "deploy this", "format the file" | Classify → Ask user for details |
+
+This reduces unnecessary API calls—conversational and ambiguous queries are handled efficiently.
 
 ### Example Flow
 
@@ -478,7 +496,7 @@ The AI will first list your files, then apply reasoning to identify matches—fa
 
 ## Conversational Queries
 
-llmd can handle conversational questions that don't require shell commands, making the tool more interactive and user-friendly:
+llmd handles conversational questions via the orchestrator—no command generation or verification needed:
 
 ```bash
 llmd "who are you"
@@ -487,7 +505,7 @@ llmd "hello"
 llmd "help me"
 ```
 
-For these queries, llmd provides informational responses instead of generating shell commands. The AI recognizes conversational intent and responds appropriately, helping users understand the tool's capabilities without executing unnecessary commands.
+The orchestrator classifies these as **conversation** intent and returns a direct response. This uses a single AI call instead of generating and verifying a fake command, making it faster and cheaper.
 
 ### Example
 

@@ -45,26 +45,27 @@ export interface SeverityCheck {
   warnings: string[];
 }
 
-export interface InfoGatheringRequest {
-  needsInfo: true;
-  probeCommand: string;
-  reason: string;
-}
+// --- Orchestrator types ---
 
-export interface CommandResponse {
-  needsInfo: false;
-  command: string;
-  explanation: string;
-}
+export type QueryIntent = 'command' | 'probe' | 'conversation' | 'clarify';
 
-export type GeneratedCommandResult = InfoGatheringRequest | CommandResponse;
+export interface IntentClassification {
+  intent: QueryIntent;
+  // For 'probe': what read-only command to run and why
+  probeCommand?: string;
+  probeReason?: string;
+  // For 'conversation': the direct response text
+  conversationalResponse?: string;
+  // For 'clarify': questions to ask the user
+  clarifyingQuestions?: string[];
+  // For 'command': optional hints for the generation step
+  commandHints?: string;
+}
 
 export interface LLMProvider {
   name: ProviderName;
+  classifyIntent(query: string, context: ShellContext): Promise<IntentClassification>;
   generateCommand(query: string, context: ShellContext): Promise<GeneratedCommand>;
-  generateCommandWithInfoGathering(query: string, context: ShellContext): Promise<GeneratedCommandResult>;
   generateCommandWithContext(query: string, context: ShellContext, gatheredInfo: string): Promise<GeneratedCommand>;
   verifyCommand(command: string, query: string, context: ShellContext): Promise<VerificationResult>;
-  checkInformationalResponse(command: string, query: string): Promise<{ isInformational: boolean; message?: string }>;
 }
-

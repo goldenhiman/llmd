@@ -2,7 +2,7 @@ import { configManager } from '../config/manager.js';
 import { createProvider } from '../providers/index.js';
 import { getShellContext } from '../utils/terminal.js';
 import { sessionManager } from './session.js';
-import type { LLMProvider, GeneratedCommand, GeneratedCommandResult, VerificationResult, ShellContext } from '../types.js';
+import type { LLMProvider, GeneratedCommand, IntentClassification, VerificationResult, ShellContext } from '../types.js';
 
 export class LLMService {
   private provider: LLMProvider | null = null;
@@ -28,47 +28,32 @@ export class LLMService {
     return this.provider;
   }
 
-  async generateCommand(query: string): Promise<GeneratedCommand> {
-    const provider = this.getProvider();
-    // Update context before generating (in case cwd changed)
+  private refreshContext(): void {
     this.context = getShellContext();
-    
-    // Ensure we have an active session
     sessionManager.getCurrentSession();
-    
-    return provider.generateCommand(query, this.context);
   }
 
-  async generateCommandWithInfoGathering(query: string): Promise<GeneratedCommandResult> {
+  async classifyIntent(query: string): Promise<IntentClassification> {
     const provider = this.getProvider();
-    // Update context before generating (in case cwd changed)
-    this.context = getShellContext();
-    
-    // Ensure we have an active session
-    sessionManager.getCurrentSession();
-    
-    return provider.generateCommandWithInfoGathering(query, this.context);
+    this.refreshContext();
+    return provider.classifyIntent(query, this.context);
+  }
+
+  async generateCommand(query: string): Promise<GeneratedCommand> {
+    const provider = this.getProvider();
+    this.refreshContext();
+    return provider.generateCommand(query, this.context);
   }
 
   async generateCommandWithContext(query: string, gatheredInfo: string): Promise<GeneratedCommand> {
     const provider = this.getProvider();
-    // Update context before generating (in case cwd changed)
-    this.context = getShellContext();
-    
-    // Ensure we have an active session
-    sessionManager.getCurrentSession();
-    
+    this.refreshContext();
     return provider.generateCommandWithContext(query, this.context, gatheredInfo);
   }
 
   async verifyCommand(command: string, query: string): Promise<VerificationResult> {
     const provider = this.getProvider();
     return provider.verifyCommand(command, query, this.context);
-  }
-
-  async checkInformationalResponse(command: string, query: string): Promise<{ isInformational: boolean; message?: string }> {
-    const provider = this.getProvider();
-    return provider.checkInformationalResponse(command, query);
   }
 
   getContext(): ShellContext {
@@ -87,4 +72,3 @@ export class LLMService {
 }
 
 export const llmService = new LLMService();
-
