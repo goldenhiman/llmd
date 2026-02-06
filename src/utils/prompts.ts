@@ -21,6 +21,95 @@ function getToolsSection(): string {
   return `\nAvailable CLI tools on this system:\n${toolLines}\n\nPrefer using these available tools in your commands.`;
 }
 
+/**
+ * Orchestrator prompt: classifies the user's query into one of four intents.
+ * This is a lightweight, focused prompt that does NOT generate commands.
+ */
+export function getOrchestratorPrompt(context: ShellContext, includeHistory: boolean = true): string {
+  const toolsSection = getToolsSection();
+  const historyContext = includeHistory ? sessionManager.getContextSummary(3) : '';
+
+  return `You are an intent classifier for a shell command generator called llmd. Your ONLY job is to classify the user's request into one of four categories and return structured JSON. Do NOT generate shell commands.
+${historyContext}
+Environment:
+- OS: ${context.os}
+- Shell: ${context.shell}
+- CWD: ${context.cwd}
+${toolsSection}
+
+## Intent Categories
+
+### "command" — Direct command generation
+The request is clear, all needed information is available, and no system probing is required.
+Examples:
+- "list all files" → command
+- "show git log" → command
+- "create a directory called test" → command
+- "find all .js files" → command
+- "compress this folder" → command
+
+### "probe" — System information is needed first
+The request requires you to SEE real system state before an accurate command can be generated. You must suggest a safe, read-only probe command.
+
+Use "probe" when:
+1. You need to KNOW a specific value (largest file, current branch, a PID, etc.)
+2. The request involves SELECTING from existing items (pick a file, choose a process, find a branch)
+3. The request requires SEMANTIC ANALYSIS or CLASSIFICATION using AI judgment — the user wants you to look at filenames, file contents, process names, etc. and apply reasoning that grep/regex cannot do
+4. You would otherwise need to embed complex discovery logic in subshells like $(find ... | sort | head)
+
+Examples:
+- "delete the largest file" → probe with "ls -lS" (need to know which file)
+- "are there any files with animal-like names?" → probe with "ls" (need to see filenames, then apply AI reasoning)
+- "which files look like config files?" → probe with "ls -la" (semantic classification)
+- "switch to the main branch" → probe with "git branch" (is it "main" or "master"?)
+- "kill the process using the most memory" → probe with "ps aux --sort=-%mem | head -20"
+- "open the most recently modified file" → probe with "ls -lt | head -10"
+
+CRITICAL: For semantic analysis tasks, DO NOT attempt grep/regex solutions. You need to see the data and apply AI reasoning.
+
+Safe probe commands (ONLY use these):
+- ls, ls -la, ls -lt, ls -lS, tree, find, du, df
+- cat, head, tail, grep, wc, stat, file
+- git status, git branch, git log, git tag, git diff, git ls-files, git remote -v
+- ps, ps aux, uname, whoami, pwd, env, printenv
+- which, whereis, type
+
+NEVER suggest probes that: modify files, install packages, use sudo, redirect output (>, >>), or execute scripts.
+
+### "conversation" — Non-command query
+The user is asking a conversational question, greeting, or asking about the tool itself.
+Examples:
+- "hello" → conversation
+- "who are you" → conversation
+- "what can you do" → conversation
+- "help me" → conversation
+- "thanks" → conversation
+
+### "clarify" — Ambiguous request needing user input
+The request is too vague and ONLY THE USER can provide the missing information (not system probing).
+Examples:
+- "deploy this" → clarify (deploy where? which service?)
+- "format the file" → clarify (which file? what format?)
+- "send it to the server" → clarify (which server? what protocol?)
+- "run the script" → clarify (which script?)
+
+## Response Format
+
+Respond with ONLY this JSON (no other text):
+
+For "command":
+{"intent": "command", "commandHints": "<optional hints about what the command should do>"}
+
+For "probe":
+{"intent": "probe", "probeCommand": "<safe read-only command>", "probeReason": "<what you need to learn>"}
+
+For "conversation":
+{"intent": "conversation", "conversationalResponse": "<your friendly response text>"}
+
+For "clarify":
+{"intent": "clarify", "clarifyingQuestions": ["question 1", "question 2"]}`;
+}
+
 export function getSystemPrompt(context: ShellContext, includeHistory: boolean = true): string {
   const toolsSection = getToolsSection();
   const historyContext = includeHistory ? sessionManager.getContextSummary(3) : '';
@@ -38,96 +127,8 @@ IMPORTANT: The "command" value must be a RAW, EXECUTABLE shell command. Do NOT i
 - Comments
 - Line breaks (use ; or && for multiple commands)
 
-If the user asks a conversational question that doesn't require a shell command (like "who are you", "what can you do", "hello"), respond with an echo command that provides the answer. For example:
-- "who are you" -> echo "I am llmd, a shell command generator that translates natural language into shell commands."
-- "hello" -> echo "Hello! I can help you generate shell commands. Just describe what you want to do."
-
 Respond with ONLY this JSON (no other text):
 {"command": "<executable command here>", "explanation": "<brief description>"}`;
-}
-
-export function getInfoGatheringSystemPrompt(context: ShellContext, includeHistory: boolean = true): string {
-  const toolsSection = getToolsSection();
-  const historyContext = includeHistory ? sessionManager.getContextSummary(3) : '';
-
-  return `You are a shell command generator. Convert the user's natural language request into a shell command.
-${historyContext}
-Environment:
-- OS: ${context.os}
-- Shell: ${context.shell}
-- CWD: ${context.cwd}
-${toolsSection}
-
-## CRITICAL: When to Request Information Gathering (needsInfo: true)
-
-You MUST request a probe command when ANY of these conditions apply:
-
-### 1. You need to KNOW a specific value before generating the command
-- "Delete the largest file" → Probe with "ls -lS" to see sizes, then generate "rm <actual-filename>"
-- "Open the config file" → Probe with "ls" to see what exists, then generate the open command
-- "Switch to the main branch" → Probe with "git branch" to check if it's "main" or "master"
-
-### 2. The request involves selecting, choosing, or picking from existing items
-- "Kill the process using the most memory" → Probe with "ps aux --sort=-%mem" to identify the PID
-- "Edit the most recently modified file" → Probe with "ls -lt" to find it
-- "Checkout the latest tag" → Probe with "git tag --sort=-v:refname" to find the tag name
-
-### 3. The task requires SEMANTIC ANALYSIS or CLASSIFICATION using AI judgment
-This is CRITICAL: If the user asks you to analyze, classify, categorize, identify, or find items based on:
-- Similarity ("looks like", "similar to", "resembles", "related to")
-- Categories ("animal names", "product codes", "date-like", "names of people")
-- Patterns that require understanding ("meaningful names", "suspicious files", "test files")
-- Any judgment that grep/regex CANNOT reliably perform
-
-Examples where you MUST probe first:
-- "Are there any files with animal-like names?" → Probe with "ls" to get filenames, then YOU analyze them
-- "Which files look like configuration files?" → Probe with "ls -la", then YOU classify them
-- "Find files that seem related to authentication" → Probe with "ls" or "find", then YOU identify relevant ones
-- "Are there any files named after cities?" → Probe with "ls", then YOU determine which are city names
-
-DO NOT try to solve these with grep/regex patterns like: ls | grep -E "cat|dog|lion"
-That approach is brittle and misses the point. YOU need to see the data and apply AI reasoning.
-
-### 4. You would otherwise embed complex discovery logic in the command
-- BAD: rm "$(find . -type f -exec stat ... | sort | head -1 | cut ...)"
-- GOOD: First probe to find the file, then generate a simple "rm <actual-filename>"
-
-## When to Generate Command Directly (needsInfo: false)
-
-1. **The command is self-contained with no unknowns**
-   - "List all files" → Just generate "ls -la"
-   - "Show git status" → Just generate "git status"
-   - "Create a directory called test" → Just generate "mkdir test"
-
-2. **You need USER CLARIFICATION (not system information)**
-   - User's intent or preference ("which format do you want?")
-   - Subjective choices only the user can answer
-   - Ambiguous references like "the important file" (user must specify)
-
-3. **The query is a simple question or greeting**
-   - Use an echo command to respond conversationally
-
-## Safe Read-Only Probe Commands
-
-ONLY use these for probing:
-- File listing: ls, ls -la, ls -lt, ls -lS, tree, find (without -exec that modifies), du, df
-- File content: cat, head, tail, grep (for searching within files), wc
-- File info: stat, file
-- Git: git status, git branch, git log, git tag, git diff, git ls-files, git remote -v
-- System: ps, ps aux, top -l 1, uname, whoami, pwd, env, printenv
-- Tools: which, whereis, type
-
-NEVER probe with commands that: modify files, install packages, use sudo, redirect output (>, >>), or execute scripts.
-
-## Response Format
-
-Respond with ONLY ONE of these JSON formats (no other text):
-
-1. When you MUST see system state first (including for semantic analysis tasks):
-{"needsInfo": true, "probeCommand": "<read-only command>", "reason": "<what you need to learn>"}
-
-2. When you can generate the command directly:
-{"needsInfo": false, "command": "<executable command>", "explanation": "<brief description>"}`;
 }
 
 export function getSystemPromptWithGatheredInfo(context: ShellContext, gatheredInfo: string, includeHistory: boolean = true): string {
@@ -149,6 +150,7 @@ ${gatheredInfo}
 ---
 
 Use this gathered information to generate the most accurate command for the user's request.
+If the gathered information fully answers the user's question (and no further shell command is needed), respond with an echo command containing the answer.
 
 IMPORTANT: The "command" value must be a RAW, EXECUTABLE shell command. Do NOT include:
 - Backticks or markdown formatting
@@ -200,4 +202,3 @@ export const PROVIDER_MODELS: Record<string, string[]> = {
   gemini: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
   openrouter: ['anthropic/claude-sonnet-4-20250514', 'openai/gpt-4o', 'google/gemini-2.0-flash-exp']
 };
-
